@@ -1,8 +1,8 @@
-# Markdown Viewer / マークダウンビューア
+# Simple Markdown Viewer / マークダウンビューア
 
 シンプルで使いやすいマークダウンビューアアプリケーションです。単一のHTMLファイルで実行され、マークダウンファイルをドラッグ＆ドロップで素早くプレビューできます。
 
-![Markdown Viewer Screenshot](/api/placeholder/800/400)
+![Markdown Viewer Screenshot](https://github.com/orimizu/SimpleMarkdownViewer/blob/main/img/SimpleMarkdownViewer.png)
 
 ## 特徴
 
@@ -17,13 +17,13 @@
 
 ### オンラインで使用
 
-1. [Markdown Viewer](https://yourname.github.io/markdown-viewer/)にアクセス
+1. [Markdown Viewer](https://orimizu.github.io/SimpleMarkdownViewer/)にアクセス
 2. マークダウンファイル（.md、.markdown、.txt）をドロップエリアにドラッグ＆ドロップ
 3. または「ファイルを選択」ボタンをクリックしてファイルを選択
 
 ### ローカルで使用
 
-1. このリポジトリをクローンするか、[リリースページ](https://github.com/yourname/markdown-viewer/releases)から最新のHTMLファイルをダウンロード
+1. このリポジトリをクローンするか、[リリースページ](https://github.com/orimizu/SimpleMarkdownViewer/releases)から最新のHTMLファイルをダウンロード
 2. index.htmlをブラウザで開く
 3. マークダウンファイルをドロップエリアにドラッグ＆ドロップまたは「ファイルを選択」ボタンから選択
 
@@ -45,22 +45,6 @@
 - CSS3: スタイリングとダークモード
 - JavaScript (ES6): インタラクション処理
 
-## 貢献方法
-
-1. このリポジトリをフォーク
-2. 新しいブランチを作成 (`git checkout -b feature/amazing-feature`)
-3. 変更をコミット (`git commit -m 'Add some amazing feature'`)
-4. ブランチにプッシュ (`git push origin feature/amazing-feature`)
-5. プルリクエストを作成
-
-## 将来の機能
-
-- [ ] ファイルの自動保存機能
-- [ ] マークダウンエディタの追加
-- [ ] PDFエクスポート機能
-- [ ] カスタムテーマのサポート
-- [ ] シンタックスハイライト機能の強化
-
 ## ライセンス
 
 [MIT License](LICENSE)
@@ -71,4 +55,7 @@
 
 ---
 
-Made with ❤️ by [Your Name](https://github.com/yourname)
+* https://github.com/orimizu
+* Twitter(X): ryuuri_tweet
+* https://youtube.com/@ryuuri
+
