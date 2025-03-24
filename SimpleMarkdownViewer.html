@@ -141,6 +141,53 @@
             background-color: #f6f8fa;
         }
         
+        /* oEmbed スタイル */
+        .oembed {
+            margin: 1.5rem 0;
+            max-width: 100%;
+            display: flex;
+            justify-content: flex-start;
+        }
+        
+        .twitter-embed {
+            min-height: 300px;
+        }
+        
+        .youtube-embed {
+            position: relative;
+            width: 100%;
+            max-width: 560px;
+            margin: 0;
+        }
+        
+        .youtube-embed iframe {
+            max-width: 100%;
+        }
+        
+        .oembed-generic {
+            padding: 1rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #f9f9f9;
+        }
+        
+        /* デバッグ情報 */
+        .debug-info {
+            margin-top: 1rem;
+            padding: 0.5rem;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            white-space: pre-wrap;
+            display: none;
+        }
+        
+        .debug-info.visible {
+            display: block;
+        }
+        
         .dark-mode {
             background-color: #1a1a1a;
             color: #f0f0f0;
@@ -177,6 +224,17 @@
             background-color: #2d2d2d;
         }
         
+        .dark-mode .oembed-generic {
+            background-color: #2d2d2d;
+            border-color: #444;
+        }
+        
+        .dark-mode .debug-info {
+            background-color: #2d2d2d;
+            border-color: #444;
+            color: #f0f0f0;
+        }
+        
         .theme-toggle {
             position: absolute;
             top: 1rem;
@@ -206,8 +264,10 @@
         <div class="markdown-output" id="markdownOutput">
             <div class="file-info" id="fileInfo"></div>
             <div class="markdown-body" id="markdownContent"></div>
+            <div class="debug-info" id="debugInfo"></div>
             <div class="action-buttons">
                 <button id="backButton">戻る</button>
+                <button id="toggleDebugButton">デバッグ情報表示</button>
             </div>
         </div>
     </div>
@@ -222,14 +282,32 @@
         const fileInput = document.getElementById('fileInput');
         const browseButton = document.getElementById('browseButton');
         const themeToggle = document.getElementById('themeToggle');
+        const debugInfo = document.getElementById('debugInfo');
+        const toggleDebugButton = document.getElementById('toggleDebugButton');
         
-        // マークダウンパーサーの設定
-        marked.setOptions({
-            breaks: true,
-            gfm: true,
-            headerIds: true,
-            highlight: function(code, lang) {
-                return code;
+        // デバッグログ
+        let debugLogs = [];
+        
+        function log(message) {
+            const timestamp = new Date().toISOString().substr(11, 8);
+            const logMessage = `[${timestamp}] ${message}`;
+            debugLogs.push(logMessage);
+            updateDebugInfo();
+        }
+        
+        function updateDebugInfo() {
+            if (debugLogs.length > 50) {
+                debugLogs = debugLogs.slice(-50); // 最新の50件だけ保持
+            }
+            debugInfo.textContent = debugLogs.join('\n');
+        }
+        
+        toggleDebugButton.addEventListener('click', () => {
+            debugInfo.classList.toggle('visible');
+            if (debugInfo.classList.contains('visible')) {
+                toggleDebugButton.textContent = 'デバッグ情報非表示';
+            } else {
+                toggleDebugButton.textContent = 'デバッグ情報表示';
             }
         });
         
@@ -296,10 +374,12 @@
             
             reader.onload = function(e) {
                 const content = e.target.result;
+                log(`ファイル読み込み完了: ${file.name} (${formatFileSize(file.size)})`);
                 displayMarkdown(content, file);
             };
             
             reader.onerror = function() {
+                log(`ファイル読み込みエラー: ${reader.error}`);
                 alert('ファイルの読み込み中にエラーが発生しました。');
             };
             
@@ -314,13 +394,59 @@
                    fileName.endsWith('.txt');
         }
         
+        // OEmbedコンテンツを前処理
+        function preProcessOembeds(content) {
+            log('OEmbed前処理開始');
+            
+            // oembedタグを直接HTMLに置き換えるシンプルな前処理
+            const oembedPattern = /\[oembed\s+(https?:\/\/[^\s\]]+)\s*\]/g;
+            
+            const processedContent = content.replace(oembedPattern, (match, url) => {
+                log(`OEmbedマッチ: ${url}`);
+                
+                // Twitter埋め込み
+                if (url.includes('twitter.com') && url.includes('/status/')) {
+                    log('→ Twitterとして処理');
+                    return `\n\n<div class="oembed-placeholder" data-type="twitter" data-url="${url}"></div>\n\n`;
+                }
+                
+                // YouTube埋め込み
+                else if (url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+                    log('→ YouTubeとして処理');
+                    return `\n\n<div class="oembed-placeholder" data-type="youtube" data-url="${url}"></div>\n\n`;
+                }
+                
+                // その他のURLは汎用リンク
+                log('→ 汎用リンクとして処理');
+                return `\n\n<div class="oembed-placeholder" data-type="generic" data-url="${url}"></div>\n\n`;
+            });
+            
+            if (processedContent === content) {
+                log('OEmbed前処理: マッチなし');
+            } else {
+                log('OEmbed前処理: 完了');
+            }
+            
+            return processedContent;
+        }
+        
         // マークダウンの表示
         function displayMarkdown(content, file) {
+            log('マークダウン表示処理開始');
+            
+            // まずoembedタグを前処理
+            const processedContent = preProcessOembeds(content);
+            
             // マークダウンをHTMLに変換
-            const htmlContent = marked.parse(content);
+            const htmlContent = marked.parse(processedContent);
+            log('マークダウン→HTML変換完了');
             
             // コンテンツを表示
             markdownContent.innerHTML = htmlContent;
+            log('HTMLコンテンツ表示完了');
+            
+            // プレースホルダーを実際の埋め込みに置き換え
+            processEmbedPlaceholders();
             
             // ファイル情報の表示
             fileInfo.textContent = `ファイル名: ${file.name} (${formatFileSize(file.size)})`;
@@ -328,6 +454,128 @@
             // 表示エリアの切り替え
             dropArea.classList.add('hidden');
             markdownOutput.classList.add('visible');
+            log('表示完了');
+        }
+        
+        // OEmbedプレースホルダーを実際の埋め込みに変換
+        function processEmbedPlaceholders() {
+            log('埋め込みプレースホルダー処理開始');
+            
+            const placeholders = document.querySelectorAll('.oembed-placeholder');
+            log(`プレースホルダー数: ${placeholders.length}`);
+            
+            placeholders.forEach((placeholder, index) => {
+                const type = placeholder.getAttribute('data-type');
+                const url = placeholder.getAttribute('data-url');
+                log(`プレースホルダー ${index+1}: タイプ=${type}, URL=${url}`);
+                
+                switch (type) {
+                    case 'twitter':
+                        renderTwitterEmbed(placeholder, url);
+                        break;
+                    case 'youtube':
+                        renderYouTubeEmbed(placeholder, url);
+                        break;
+                    default:
+                        renderGenericEmbed(placeholder, url);
+                }
+            });
+        }
+        
+        // Twitter埋め込みの表示
+        function renderTwitterEmbed(placeholder, url) {
+            log(`Twitter埋め込み表示: ${url}`);
+            
+            // TwitterのDOM要素を作成
+            const container = document.createElement('div');
+            container.className = 'oembed twitter-embed';
+            container.innerHTML = `
+                <blockquote class="twitter-tweet" data-dnt="true">
+                    <a href="${url}"></a>
+                </blockquote>
+            `;
+            
+            // プレースホルダーを置き換え
+            placeholder.replaceWith(container);
+            
+            // Twitter埋め込みスクリプトを読み込み・実行
+            if (!document.querySelector('script[src="https://platform.twitter.com/widgets.js"]')) {
+                log('Twitterウィジェットスクリプト読み込み');
+                const script = document.createElement('script');
+                script.async = true;
+                script.charset = 'utf-8';
+                script.src = 'https://platform.twitter.com/widgets.js';
+                script.onload = () => {
+                    log('Twitterウィジェット読み込み完了');
+                    // スクリプト読み込み後にTwitterウィジェットを手動で処理
+                    if (window.twttr && window.twttr.widgets) {
+                        window.twttr.widgets.load(container);
+                        log('Twitterウィジェット手動処理実行');
+                    }
+                };
+                document.body.appendChild(script);
+            } else {
+                log('Twitterウィジェットスクリプト既存');
+                // 既にスクリプトが読み込まれている場合は手動で処理
+                setTimeout(() => {
+                    if (window.twttr && window.twttr.widgets) {
+                        window.twttr.widgets.load(container);
+                        log('Twitterウィジェット手動処理実行');
+                    }
+                }, 100);
+            }
+        }
+        
+        // YouTube埋め込みの表示
+        function renderYouTubeEmbed(placeholder, url) {
+            log(`YouTube埋め込み表示: ${url}`);
+            
+            let videoId = '';
+            
+            if (url.includes('youtube.com/watch')) {
+                try {
+                    const urlObj = new URL(url);
+                    videoId = urlObj.searchParams.get('v');
+                } catch (e) {
+                    log(`YouTube URL解析エラー: ${e.message}`);
+                }
+            } else if (url.includes('youtu.be/')) {
+                videoId = url.split('/').pop().split('?')[0];
+            }
+            
+            if (!videoId) {
+                log('YouTube動画IDの取得に失敗');
+                return renderGenericEmbed(placeholder, url);
+            }
+            
+            log(`YouTube動画ID: ${videoId}`);
+            
+            // YouTubeのiframeを作成
+            const container = document.createElement('div');
+            container.className = 'oembed youtube-embed';
+            container.innerHTML = `
+                <iframe width="560" height="315" 
+                    src="https://www.youtube.com/embed/${videoId}" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen>
+                </iframe>
+            `;
+            
+            // プレースホルダーを置き換え
+            placeholder.replaceWith(container);
+        }
+        
+        // 汎用埋め込みの表示
+        function renderGenericEmbed(placeholder, url) {
+            log(`汎用埋め込み表示: ${url}`);
+            
+            const container = document.createElement('div');
+            container.className = 'oembed-generic';
+            container.innerHTML = `<a href="${url}" target="_blank">${url}</a>`;
+            
+            // プレースホルダーを置き換え
+            placeholder.replaceWith(container);
         }
         
         // ファイルサイズのフォーマット
@@ -347,12 +595,17 @@
             dropArea.classList.remove('hidden');
             markdownContent.innerHTML = '';
             fileInfo.textContent = '';
+            debugLogs = [];
+            updateDebugInfo();
+            log('初期画面に戻りました');
         });
         
         // ダークモード切り替え
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
         });
+        
+        log('アプリケーション初期化完了');
     </script>
 </body>
 </html>
