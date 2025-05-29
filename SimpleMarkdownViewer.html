@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>マークダウンビューア</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.3.0/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -245,6 +246,16 @@
             font-size: 1.2rem;
             cursor: pointer;
         }
+        
+        /* Mermaidスタイル */
+        .mermaid {
+            text-align: center;
+            margin: 1rem 0;
+        }
+        
+        .dark-mode .mermaid {
+            filter: invert(1) hue-rotate(180deg);
+        }
     </style>
 </head>
 <body>
@@ -430,12 +441,55 @@
             return processedContent;
         }
         
+        // Mermaidコードブロックの前処理
+        function preProcessMermaid(content) {
+            log('Mermaid前処理開始');
+            
+            // 4つのバッククォートで囲まれた部分を一時的に保護
+            const protectedBlocks = [];
+            let protectedContent = content.replace(/````[\s\S]*?````/g, (match) => {
+                const placeholder = `__PROTECTED_BLOCK_${protectedBlocks.length}__`;
+                protectedBlocks.push(match);
+                return placeholder;
+            });
+            
+            // ```mermaid で始まるコードブロックを検出（保護されていない部分のみ）
+            const mermaidPattern = /```mermaid\n([\s\S]*?)\n```/g;
+            let mermaidCounter = 0;
+            
+            const processedContent = protectedContent.replace(mermaidPattern, (match, mermaidCode) => {
+                mermaidCounter++;
+                const mermaidId = `mermaid-${Date.now()}-${mermaidCounter}`;
+                log(`Mermaidコードブロック検出: ${mermaidId}`);
+                
+                // Mermaidコードを一意のdivに置き換え
+                return `\n\n<div class="mermaid" id="${mermaidId}">\n${mermaidCode.trim()}\n</div>\n\n`;
+            });
+            
+            // 保護されたブロックを元に戻す
+            let finalContent = processedContent;
+            protectedBlocks.forEach((block, index) => {
+                finalContent = finalContent.replace(`__PROTECTED_BLOCK_${index}__`, block);
+            });
+            
+            if (mermaidCounter > 0) {
+                log(`Mermaid前処理完了: ${mermaidCounter}個のコードブロックを処理`);
+            } else {
+                log('Mermaid前処理: マッチなし');
+            }
+            
+            return finalContent;
+        }
+
         // マークダウンの表示
         function displayMarkdown(content, file) {
             log('マークダウン表示処理開始');
             
-            // まずoembedタグを前処理
-            const processedContent = preProcessOembeds(content);
+            // まずMermaidコードブロックを前処理
+            let processedContent = preProcessMermaid(content);
+            
+            // 次にoembedタグを前処理
+            processedContent = preProcessOembeds(processedContent);
             
             // マークダウンをHTMLに変換
             const htmlContent = marked.parse(processedContent);
@@ -444,6 +498,32 @@
             // コンテンツを表示
             markdownContent.innerHTML = htmlContent;
             log('HTMLコンテンツ表示完了');
+            
+            // Mermaidライブラリが読み込まれるまで待機してからレンダリング
+            if (typeof mermaid !== 'undefined') {
+                // すでに読み込まれている場合は即座に実行
+                setTimeout(() => renderMermaidDiagrams(), 100);
+            } else {
+                // ライブラリの読み込みを待機
+                log('Mermaidライブラリの読み込みを待機中...');
+                let checkCount = 0;
+                const checkMermaid = setInterval(() => {
+                    checkCount++;
+                    if (typeof mermaid !== 'undefined') {
+                        clearInterval(checkMermaid);
+                        log('Mermaidライブラリ読み込み完了、レンダリング開始');
+                        renderMermaidDiagrams();
+                    } else if (checkCount > 50) { // 5秒でタイムアウト
+                        clearInterval(checkMermaid);
+                        log('Mermaidライブラリの読み込みタイムアウト');
+                        // エラーメッセージを表示
+                        const mermaidElements = document.querySelectorAll('.mermaid');
+                        mermaidElements.forEach(element => {
+                            element.innerHTML = '<div style="color: red; border: 1px solid red; padding: 1rem;">Mermaidライブラリの読み込みに失敗しました</div>';
+                        });
+                    }
+                }, 100);
+            }
             
             // プレースホルダーを実際の埋め込みに置き換え
             processEmbedPlaceholders();
@@ -578,6 +658,106 @@
             placeholder.replaceWith(container);
         }
         
+        // Mermaid図表のレンダリング
+        function renderMermaidDiagrams() {
+            log('Mermaid図表レンダリング開始');
+            
+            const mermaidElements = document.querySelectorAll('.mermaid');
+            
+            if (mermaidElements.length === 0) {
+                log('Mermaid要素が見つかりません');
+                return;
+            }
+            
+            log(`Mermaid要素数: ${mermaidElements.length}`);
+            
+            // Mermaidライブラリの確認
+            if (typeof mermaid === 'undefined') {
+                log('Mermaidライブラリが読み込まれていません');
+                mermaidElements.forEach(element => {
+                    element.innerHTML = '<div style="color: red; border: 1px solid red; padding: 1rem;">Mermaidライブラリが読み込まれていません</div>';
+                });
+                return;
+            }
+            
+            // ダークモードの判定
+            const isDarkMode = document.body.classList.contains('dark-mode');
+            const theme = isDarkMode ? 'dark' : 'default';
+            
+            log(`Mermaidテーマ設定: ${theme}`);
+            
+            // Mermaidを初期化
+            try {
+                mermaid.initialize({
+                    startOnLoad: false,
+                    theme: theme,
+                    securityLevel: 'loose',
+                    fontFamily: 'inherit',
+                    logLevel: 'debug'
+                });
+                
+                log('Mermaid初期化完了');
+            } catch (error) {
+                log(`Mermaid初期化エラー: ${error.message}`);
+                return;
+            }
+            
+            // 各Mermaid要素を処理
+            mermaidElements.forEach((element, index) => {
+                const graphDefinition = element.textContent.trim();
+                const elementId = element.id || `mermaid-diagram-${Date.now()}-${index}`;
+                
+                log(`Mermaid図表処理開始: ${elementId}`);
+                log(`図表定義: ${graphDefinition.substring(0, 50)}...`);
+                
+                if (!graphDefinition) {
+                    log(`空の図表定義: ${elementId}`);
+                    element.innerHTML = '<div style="color: orange; border: 1px solid orange; padding: 1rem;">空のMermaid図表です</div>';
+                    return;
+                }
+                
+                try {
+                    // render関数を使用してSVGを生成
+                    mermaid.render(elementId + '-svg', graphDefinition)
+                        .then(({ svg, bindFunctions }) => {
+                            log(`Mermaidレンダリング成功: ${elementId}`);
+                            element.innerHTML = svg;
+                            
+                            // バインド関数があれば実行
+                            if (bindFunctions) {
+                                try {
+                                    bindFunctions(element);
+                                    log(`Mermaidバインド関数実行完了: ${elementId}`);
+                                } catch (bindError) {
+                                    log(`Mermaidバインド関数エラー: ${elementId} - ${bindError.message}`);
+                                }
+                            }
+                        })
+                        .catch(error => {
+                            log(`Mermaidレンダリングエラー: ${elementId} - ${error.message}`);
+                            element.innerHTML = `<div style="color: red; border: 1px solid red; padding: 1rem;">
+                                <strong>Mermaid図表のレンダリングに失敗しました</strong><br>
+                                エラー: <code>${error.message}</code><br>
+                                <details>
+                                    <summary>図表定義を表示</summary>
+                                    <pre style="background: #f5f5f5; padding: 0.5rem; margin-top: 0.5rem;">${graphDefinition}</pre>
+                                </details>
+                            </div>`;
+                        });
+                } catch (error) {
+                    log(`Mermaid図表処理エラー: ${elementId} - ${error.message}`);
+                    element.innerHTML = `<div style="color: red; border: 1px solid red; padding: 1rem;">
+                        <strong>Mermaid図表の処理に失敗しました</strong><br>
+                        エラー: <code>${error.message}</code><br>
+                        <details>
+                            <summary>図表定義を表示</summary>
+                            <pre style="background: #f5f5f5; padding: 0.5rem; margin-top: 0.5rem;">${graphDefinition}</pre>
+                        </details>
+                    </div>`;
+                }
+            });
+        }
+        
         // ファイルサイズのフォーマット
         function formatFileSize(bytes) {
             if (bytes === 0) return '0 Bytes';
@@ -603,6 +783,13 @@
         // ダークモード切り替え
         themeToggle.addEventListener('click', () => {
             document.body.classList.toggle('dark-mode');
+            
+            // Mermaid図表があれば再レンダリング
+            const mermaidElements = document.querySelectorAll('.mermaid');
+            if (mermaidElements.length > 0) {
+                log('テーマ変更によりMermaid図表を再レンダリング');
+                renderMermaidDiagrams();
+            }
         });
         
         log('アプリケーション初期化完了');
